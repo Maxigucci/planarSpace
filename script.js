@@ -2,7 +2,7 @@ import {createNoise2D} from './simplex-noise.min.js';
 
 //classes
 class SpatialPoint{
-  constructor(x, y, z, distanceFromPrevPoint, dx=1, dy=1, dz=1){
+  constructor(x, y, z, distanceFromPrevPoint=0, dx=1, dy=1, dz=1){
     this.x= x;
     this.y= y;
     this.z= z;
@@ -24,9 +24,10 @@ class RenderPoint{
 
 //every square object from this class will have initial 3D coordinates specified by the spatialPoint object, the axis points are parametric functions of time. as time progresses the x and z coordinates trace an inward/collapsing orbit around the plane center and y coordinate is determined by a noise function that is unique to every instance of square where the range of y steadily shrinks to 0 proportional to the rate of orbit collapse.
 class Square{
-  constructor(spatialPoint, width, height, dAngleAlongOrbit=Math.PI/5, numOfOrbitsToCenter=3){
-    this.spatialPoint= spatialPoint;
-    this.renderPoint= new RenderPoint();
+  constructor(currentOrbitRadius, initOrbitAngle, width, height, dAngleAlongOrbit=Math.PI/5, numOfOrbitsToCenter=3){
+    
+    this.currentOrbitRadius= currentOrbitRadius;
+    this.initOrbitAngle= initOrbitAngle;
     this.width= width;
     this.height= height;
     this.dAngleAlongOrbit= dAngleAlongOrbit/framePerSecond;
@@ -37,12 +38,14 @@ class Square{
     this.currentNoiseRange= canvas.height; //noise range is for the y-axis
     // the following must be derived on inistantiation of the object
     this.numOfStepsToCenter= 0;
-    this.currentOrbitAngle= 0;
-    this.initOrbitAngle= 0;
-    this.currentOrbitRadius= 0;
     this.dOrbitRadius= 0;
     this.dNoiseRange= 0;
+    this.curveLength= 0;
+    this.speedAlongCurve= 0;
     this.pointsOnPath= [];
+    
+    this.spatialPoint= this.initSpatialPoint();
+    this.renderPoint= new RenderPoint();
   }
   scaledNoise1D(t, min, max){
     const noise1D=(t)=>{ return this.noise2D(t, 0)}
@@ -61,19 +64,17 @@ class Square{
   yCoordinate(t, min, max){
     return this.scaledNoise1D(t, min, max);
   }
+  initSpatialPoint(){
+    //this function returns the initial spatialPoint of the square based on distance/radius from center and angle along the circle
+    
+    let t= 0; //initial time
+    let x= this.xCoordinate(t);
+    let z= this.zCoordinate(t);
+    let y= this.yCoordinate(t, 0, canvas.height);
+    
+    return new SpatialPoint(x, y, z)
+  }
   computePointsOnPath(){
-    //derive radius
-    let xCenter= midSpaceWidth;
-    let zCenter= midSpaceDepth;
-    let xDiff= this.spatialPoint.x-xCenter;
-    let zDiff= this.spatialPoint.z-zCenter;
-    this.currentOrbitRadius= Math.sqrt((xDiff*xDiff)+(zDiff+zDiff));
-    
-    //derive current angle on x,z plane
-    let angle= Math.atan2(zDiff, xDiff);
-    this.currentOrbitAngle= (angle<0)?angle+ 2*Math.PI: angle;
-    this.initOrbitAngle= this.currentOrbitAngle;
-    
     //derive numOfStepsToCenter
     this.numOfStepsToCenter= ((2*Math.PI)/this.dAngleAlongOrbit)*this.numOfOrbitsToCenter;
     
@@ -81,12 +82,8 @@ class Square{
     this.dOrbitRadius= (-this.currentOrbitRadius)/(this.numOfStepsToCenter-1);
     this.dNoiseRange= (-this.currentNoiseRange)/(this.numOfStepsToCenter-1);
     
-    this.pointsOnPath.push(this.spatialPoint)
     let t=0;
     for(let i=0; i<this.numOfStepsToCenter; i++){
-      t+=dTime;
-      this.currentOrbitRadius+=this.dOrbitRadius;
-      this.currentNoiseRange+=this.dNoiseRange;
       let rangeDiff= this.initNoiseRange-this.currentNoiseRange;
       let min= rangeDiff/2;
       let max= this.initNoiseRange-min;
@@ -94,19 +91,22 @@ class Square{
       let z= this.zCoordinate(t);
       let x= this.xCoordinate(t);
       let y= this.yCoordinate(t, min, max);
-      let zDiff= this.zCoordinate(t-dTime)- z;
-      let xDiff= this.xCoordinate(t-dTime)- x;
-      let yDiff= this.yCoordinate(t-dTime, min, max)- y;
-      this.pointsOnPath.push(new SpatialPoint(x, y, z, Math.sqrt((xDiff*xDiff)+(yDiff*yDiff)+(zDiff*zDiff)) ));
+      let zDiff= (t > 0)?this.zCoordinate(t-dTime)- z: 0;
+      let xDiff= (t > 0)?this.xCoordinate(t-dTime)- x: 0;
+      let yDiff= (t > 0)?this.yCoordinate(t-dTime, min, max)- y: 0;
+      let distanceFromPrevPoint= Math.sqrt((xDiff*xDiff)+(yDiff*yDiff)+(zDiff*zDiff))
+      this.curveLength+= distanceFromPrevPoint;
+      this.pointsOnPath.push(new SpatialPoint(x, y, z, distanceFromPrevPoint) );
+      
+      t+=dTime;
+      this.currentOrbitRadius+=this.dOrbitRadius;
+      this.currentNoiseRange+=this.dNoiseRange;
       
     }
-    
+    this.speedAlongCurve= this.curveLength/(10*framePerSecond);
+    console.log(this.speedAlongCurve)
   }
-  updateRenderParameters(x, y, z){
-    this.spatialPoint.x= x;
-    this.spatialPoint.y= y;
-    this.spatialPoint.z= z;
-    
+  updateRenderParameters(spatialX, spatialY, spatialZ){
     let xDistanceFromCenter= this.spatialPoint.x - midSpaceWidth;
     let yDistanceFromCenter= this.spatialPoint.y - midSpaceHeight;
     let triangleHeight= this.spatialPoint.z + viewerDistance;
@@ -135,7 +135,6 @@ class Square{
     ctx.beginPath();
     ctx.rect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
     ctx.stroke();
-    console.log(this.pointsOnPath)
     ctx.beginPath();
     ctx.moveTo(this.pointsOnPath[0].x, this.pointsOnPath[0].y);
     for(let i=0; i<this.pointsOnPath.length; i++){
@@ -256,12 +255,11 @@ function draw(){
   drawDepth()
   
   //test
-  let newSpatialPoint= new SpatialPoint(canvas.width*0.9, canvas.height/2, maxSpaceDepth*1)
-  let newSquare= new Square(newSpatialPoint, squareWidth, squareHeight);
+  let newSquare= new Square(canvas.width/2, Math.PI, squareWidth, squareHeight);
   newSquare.computePointsOnPath()
   newSquare.draw();
-  console.log(newSquare.scaledNoise1D(currentTime, 0, canvas.height));
-  console.log(newSquare.pointsOnPath)
+  //console.log(newSquare.scaledNoise1D(currentTime, 0, canvas.height));
+  //console.log(newSquare.pointsOnPath)
   
 }
 
