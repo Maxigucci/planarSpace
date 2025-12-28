@@ -36,12 +36,15 @@ class Square{
     this.noise2D = createNoise2D(prng);
     this.initNoiseRange= canvas.height
     this.currentNoiseRange= canvas.height; //noise range is for the y-axis
-    // the following must be derived on inistantiation of the object
+    
+    // the following will be derived on inistantiation of the object
     this.numOfStepsToCenter= 0;
     this.dOrbitRadius= 0;
     this.dNoiseRange= 0;
+    //Curve in the following refers to the path the square will take in 3D space. it is precomputed as points in pointsAlongPath array
     this.curveLength= 0;
     this.speedAlongCurve= 0;
+    this.currentDistanceAlongCurve= 0;
     this.pointsOnPath= [];
     
     this.spatialPoint= this.initSpatialPoint();
@@ -142,6 +145,35 @@ class Square{
     }
     ctx.stroke();
   }
+  updatePointAlongPath(){
+    this.currentDistanceAlongCurve+= this.speedAlongCurve;
+    
+    //these are distances from 0 to points along the path 
+    let distanceAtCurrentPoint= 0;
+    let distanceAtPrevPoint= 0;
+    
+    this.pointsAlongPath.some(currentPoint, index, array){
+      if(distanceAtCurrentPoint < this.currentDistanceAlongCurve){
+        distanceAtPrevPoint= distanceAtCurrentPoint;
+        distanceAtCurrentPoint+= currentPoint.distanceFromPrevPoint;
+      }else if(distanceAtCurrentPoint > this.currentDistanceAlongCurve){
+        let segmentRatio= (this.currentDistanceAlongCurve - distanceAtPrevPoint)/(distanceAtCurrentPoint - distanceAtPrevPoint);
+        let prevPoint= array[index-1];
+        
+        this.spatialPoint.x= prevPoint.x+ (segmentRatio+(currentPoint.x- prevPoint.x));
+        this.spatialPoint.y= prevPoint.y+ (segmentRatio+(currentPoint.y- prevPoint.y));
+        this.spatialPoint.z= prevPoint.z+ (segmentRatio+(currentPoint.z- prevPoint.z));
+        
+        return true;
+      }else{
+        this.spatialPoint.x= currentPoint.x;
+        this.spatialPoint.y= currentPoint.y;
+        this.spatialPoint.z= currentPoint.z;
+        return true;
+      }
+    }
+  }
+  
 }
 /** section end **/
 
@@ -259,7 +291,7 @@ function draw(){
   newSquare.computePointsOnPath()
   newSquare.draw();
   //console.log(newSquare.scaledNoise1D(currentTime, 0, canvas.height));
-  //console.log(newSquare.pointsOnPath)
+  console.log(newSquare.pointsOnPath)
   
 }
 
