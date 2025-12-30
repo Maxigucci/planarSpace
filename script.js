@@ -2,34 +2,30 @@ import {createNoise2D} from './simplex-noise.min.js';
 
 //classes
 class SpatialPoint{
-  constructor(x, y, z, distanceFromPrevPoint=0, dx=1, dy=1, dz=1){
+  constructor(x, y, z, distanceFromPrevPoint=0){
     this.x= x;
     this.y= y;
     this.z= z;
     this.distanceFromPrevPoint= distanceFromPrevPoint;
-    this.dx= dx;
-    this.dy= dy;
-    this.dz= dz;
   }
 }
 
 class RenderPoint{
-  constructor(x, y, dx=1, dy=1){
+  constructor(x, y){
     this.x= x;
     this.y= y;
-    this.dx= dx;
-    this.dy= dy;
   }
 }
 
-//every square object from this class will have initial 3D coordinates specified by the spatialPoint object, the axis points are parametric functions of time. as time progresses the x and z coordinates trace an inward/collapsing orbit around the plane center and y coordinate is determined by a noise function that is unique to every instance of square where the range of y steadily shrinks to 0 proportional to the rate of orbit collapse.
+//every square object from this class will have initial 3D coordinates that will be determined using orbit radius on x,z plane and initail angle on the same plane to derive the spatial point, the axis points are parametric functions of time. as time progresses the x and z coordinates trace an inward/collapsing orbit around the plane center and y coordinate is determined by a noise function that is unique to every instance of square where the range of y steadily shrinks to 0 proportional to the rate of orbit collapse.
 class Square{
-  constructor(currentOrbitRadius, initOrbitAngle, width, height, dAngleAlongOrbit=Math.PI/5, numOfOrbitsToCenter=3){
+  constructor(currentOrbitRadius, initOrbitAngle, width, height, dAngleAlongOrbit=Math.PI/5, numOfOrbitsToCenter=5){
     
     this.currentOrbitRadius= currentOrbitRadius;
     this.initOrbitAngle= initOrbitAngle;
     this.width= width;
     this.height= height;
+    this.radius= (this.width<this.height)? this.width: this.height; //this class is meant to be a template for a square object but i will add this parameter incase i want to draw a circle at its coordinates
     this.dAngleAlongOrbit= dAngleAlongOrbit/framePerSecond;
     //dAngleAlongOrbit must be in rad and it is per second (60 frames ≈ 1 second). During property assignment above, it is converted to be per frame.
     this.numOfOrbitsToCenter=numOfOrbitsToCenter;
@@ -49,6 +45,9 @@ class Square{
     
     this.spatialPoint= this.initSpatialPoint();
     this.renderPoint= new RenderPoint();
+    
+    this.computePointsOnPath();
+    this.updateRenderParameters()
   }
   scaledNoise1D(t, min, max){
     const noise1D=(t)=>{ return this.noise2D(t, 0)}
@@ -106,10 +105,12 @@ class Square{
       this.currentNoiseRange+=this.dNoiseRange;
       
     }
-    this.speedAlongCurve= this.curveLength/(10*framePerSecond);
-    console.log(this.speedAlongCurve)
+    this.speedAlongCurve= this.curveLength/(30*framePerSecond);
+    
   }
-  updateRenderParameters(spatialX, spatialY, spatialZ){
+  updateRenderParameters(){
+    // the render parameters are the x and y coordinates on the screen as well as the width and height OR radius at various depths
+    
     let xDistanceFromCenter= this.spatialPoint.x - midSpaceWidth;
     let yDistanceFromCenter= this.spatialPoint.y - midSpaceHeight;
     let triangleHeight= this.spatialPoint.z + viewerDistance;
@@ -124,54 +125,77 @@ class Square{
     //update speed
     let renderSpaceWidth= (viewerDistance/(triangleHeight/midSpaceWidth))*2;
     let renderSpaceHeight= (viewerDistance/(triangleHeight/midSpaceHeight))*2;
-    
-    this.renderPoint.dx= (this.spatialPoint.dx*renderSpaceWidth)/maxSpaceWidth;
-    this.renderPoint.dy= (this.spatialPoint.dy*renderSpaceHeight)/maxSpaceHeight;
+    console.log(renderSpaceWidth)
     
     //update width and height
-    this.width= (this.width*renderSpaceWidth)/maxSpaceWidth;
-    this.height= (this.height*renderSpaceHeight)/maxSpaceHeight;
+    this.width= (squareWidth*renderSpaceWidth)/maxSpaceWidth;
+    this.height= (squareHeight*renderSpaceHeight)/maxSpaceHeight;
+    
+    /**
+    this.renderPoint.dx= (this.spatialPoint.dx*renderSpaceWidth)/maxSpaceWidth;
+    this.renderPoint.dy= (this.spatialPoint.dy*renderSpaceHeight)/maxSpaceHeight;
+    **/
     
   }
   draw(){
-    this.updateRenderParameters(this.spatialPoint.x, this.spatialPoint.y, this.spatialPoint.z)
+    
     ctx.beginPath();
     ctx.rect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
     ctx.stroke();
+    
+    /**
+    //test: draw path
     ctx.beginPath();
     ctx.moveTo(this.pointsOnPath[0].x, this.pointsOnPath[0].y);
     for(let i=0; i<this.pointsOnPath.length; i++){
       ctx.lineTo(this.pointsOnPath[i].x, this.pointsOnPath[i].y);
     }
     ctx.stroke();
+    **/
   }
-  updatePointAlongPath(){
+  
+  updateSpatialPoint(){
     this.currentDistanceAlongCurve+= this.speedAlongCurve;
+    
     
     //these are distances from 0 to points along the path 
     let distanceAtCurrentPoint= 0;
     let distanceAtPrevPoint= 0;
     
-    this.pointsAlongPath.some(currentPoint, index, array){
+    
+    
+    this.pointsOnPath.some((currentPoint, index, array)=>{
       if(distanceAtCurrentPoint < this.currentDistanceAlongCurve){
+        //console.log("less than")
         distanceAtPrevPoint= distanceAtCurrentPoint;
         distanceAtCurrentPoint+= currentPoint.distanceFromPrevPoint;
+        //console.log("less than")
       }else if(distanceAtCurrentPoint > this.currentDistanceAlongCurve){
+        //console.log("finalyGreater")
         let segmentRatio= (this.currentDistanceAlongCurve - distanceAtPrevPoint)/(distanceAtCurrentPoint - distanceAtPrevPoint);
         let prevPoint= array[index-1];
-        
+        //console.log(prevPoint)
         this.spatialPoint.x= prevPoint.x+ (segmentRatio+(currentPoint.x- prevPoint.x));
         this.spatialPoint.y= prevPoint.y+ (segmentRatio+(currentPoint.y- prevPoint.y));
         this.spatialPoint.z= prevPoint.z+ (segmentRatio+(currentPoint.z- prevPoint.z));
         
         return true;
       }else{
+        //console.log("equal")
         this.spatialPoint.x= currentPoint.x;
         this.spatialPoint.y= currentPoint.y;
         this.spatialPoint.z= currentPoint.z;
         return true;
       }
-    }
+    })
+  }
+  moveAlongPath(){
+    this.updateSpatialPoint();
+    console.log(this.spatialPoint)
+    this.updateRenderParameters();
+    console.log(this.renderPoint)
+    console.log(this.width)
+    this.draw();
   }
   
 }
@@ -189,8 +213,8 @@ let midSpaceHeight;
 let squareWidth;
 let squareHeight;
 
-const dTime= 0.01
-const currentTime= 0.03;
+const dTime= 0.001
+const currentTime= 0.9;
 const framePerSecond= 60;
 /** section end **/
 
@@ -223,6 +247,21 @@ function resizeCanvas(){
   canvas.height = canvasHeight*scale;
   ctx.lineWidth *= scale;
 }//functEnd
+
+function updateDrawingVariables(){
+  //this is whete we update the variables that depend on the dimensions of the canvas. this function will be called everytime the canvas is resized
+  
+  maxSpaceWidth= canvas.width;
+  maxSpaceHeight= canvas.height;
+  midSpaceWidth= maxSpaceWidth/2;
+  midSpaceHeight= maxSpaceHeight/2;
+  
+  viewerDistance= canvas.width*0.5;
+  maxSpaceDepth= canvas.width;
+  midSpaceDepth= maxSpaceDepth/2;
+  squareWidth= canvas.width*0.1;
+  squareHeight= canvas.height*0.1;
+}
 
 const seededRandom=(seed)=>{
   // ensure seed is a positive integer
@@ -271,38 +310,32 @@ function drawDepth(){
   ctx.stroke();
 }
 
-function draw(){
-  //The following global variables are primarily used by this function they must be updated everytime the resizeCanvas function is called because they depend on the current canvas dimensions
-  maxSpaceWidth= canvas.width;
-  maxSpaceHeight= canvas.height;
-  midSpaceWidth= maxSpaceWidth/2;
-  midSpaceHeight= maxSpaceHeight/2;
+function animate(newSquare){
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  drawDepth();
+  newSquare.moveAlongPath();
   
-  viewerDistance= canvas.width*0.5;
-  maxSpaceDepth= canvas.width;
-  midSpaceDepth= maxSpaceDepth/2;
-  squareWidth= canvas.width*0.3;
-  squareHeight= canvas.height*0.3;
   
-  drawDepth()
   
-  //test
-  let newSquare= new Square(canvas.width/2, Math.PI, squareWidth, squareHeight);
-  newSquare.computePointsOnPath()
-  newSquare.draw();
+  requestAnimationFrame(()=> animate(newSquare));
+  //newSquare.draw();
   //console.log(newSquare.scaledNoise1D(currentTime, 0, canvas.height));
-  console.log(newSquare.pointsOnPath)
+  //console.log(newSquare.pointsOnPath);
   
 }
 
 function render(){
   resizeCanvas();
-  draw();
+  updateDrawingVariables();
+  let newSquare= new Square(canvas.width/2, Math.PI, squareWidth, squareHeight);
+  //console.log(newSquare.pointsOnPath)
+  animate(newSquare);
 }
 
 //...initial render
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
+
 render();
 /** section end **/
 
