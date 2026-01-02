@@ -138,9 +138,10 @@ class Square{
     
   }
   draw(){
-    
+    let lightness= lightnessAtDepth(this.spatialPoint.z);
+    ctx.fillStyle= colorAtLightness(lightness);
     ctx.beginPath();
-    ctx.rect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
+    ctx.fillRect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
     ctx.stroke();
     
     /**
@@ -216,6 +217,11 @@ let squareHeight;
 const dTime= 0.001
 const currentTime= 0.9;
 const framePerSecond= 60;
+
+let maxLightness= 50; 
+let minLightness= 25;
+let lightnessRange= maxLightness-minLightness;
+let depthRange;
 /** section end **/
 
 //functions
@@ -240,12 +246,17 @@ function resizeCanvas(){
   //set canvas DOM height & width
   canvas.style.width = `${canvasWidth}px`;
   canvas.style.height = `${canvasHeight}px`;
+  depthCanvas.style.width = `${canvasWidth}px`;
+  depthCanvas.style.height = `${canvasHeight}px`;
 
   //set canvas resolution height & width
   const scale = 5;
   canvas.width = canvasWidth*scale;
   canvas.height = canvasHeight*scale;
+  depthCanvas.width= canvasWidth*scale;
+  depthCanvas.height= canvasHeight*scale;
   ctx.lineWidth *= scale;
+  dctx.lineWidth *= scale;
 }//functEnd
 
 function updateDrawingVariables(){
@@ -261,6 +272,8 @@ function updateDrawingVariables(){
   midSpaceDepth= maxSpaceDepth/2;
   squareWidth= canvas.width*0.1;
   squareHeight= canvas.height*0.1;
+  
+  depthRange= maxSpaceDepth;
 }
 
 const seededRandom=(seed)=>{
@@ -275,44 +288,90 @@ const seededRandom=(seed)=>{
 }//functEnd
 const prng= seededRandom(3);
 
+const lightnessAtDepth=(depth)=>{
+  let lightnessPoint= (depth *lightnessRange)/depthRange;
+  let lightness= maxLightness- lightnessPoint;
+  return lightness;
+}
+
+const colorAtLightness =(lightness)=>{
+    return `hsl(210, 20%, ${lightness}%)`
+  }
+
 function drawDepth(){
-  let triangleHeight= maxSpaceDepth + viewerDistance;
-  let height_BaseX_ratio= triangleHeight/midSpaceWidth;
-  let height_BaseY_ratio= triangleHeight/midSpaceHeight;
-  let renderXFromCenter= viewerDistance/height_BaseX_ratio;
-  let renderYFromCenter= viewerDistance/height_BaseY_ratio;
+  const planeAtDepth=(depth)=>{
+    let triangleHeight= depth + viewerDistance;
+    let height_BaseX_ratio= triangleHeight/midSpaceWidth;
+    let height_BaseY_ratio= triangleHeight/midSpaceHeight;
+    let renderXFromCenter= viewerDistance/height_BaseX_ratio;
+    let renderYFromCenter= viewerDistance/height_BaseY_ratio;
   
-  let backPlaneX= midSpaceWidth-renderXFromCenter;
-  let backPlaneY= midSpaceHeight-renderYFromCenter;
+    let planeX= midSpaceWidth-renderXFromCenter;
+    let planeY= midSpaceHeight-renderYFromCenter;
+    
+    let planeWidth= renderXFromCenter*2;
+    let planeHeight= renderYFromCenter*2;
+    
+    return {
+      x: planeX,
+      y: planeY,
+      width: planeWidth,
+      height: planeHeight
+    }
+  }
   
-  ctx.beginPath();
-  ctx.rect(backPlaneX, backPlaneY, (renderXFromCenter*2), (renderYFromCenter*2));
-  ctx.stroke();
+  for(let i=0; i<maxSpaceDepth; i++){
+    let plane= planeAtDepth(i);
+    let lightness= lightnessAtDepth(i);
+    dctx.fillStyle = colorAtLightness(lightness);
+    dctx.fillRect(plane.x, plane.y, plane.width, plane.height);
+    
+  }
   
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(backPlaneX, backPlaneY);
-  ctx.stroke();
+  let backPlane = planeAtDepth(maxSpaceDepth);
+  let frontPlane= planeAtDepth(0)
   
-  ctx.beginPath();
-  ctx.moveTo(canvas.width, 0);
-  ctx.lineTo(backPlaneX+(renderXFromCenter*2), backPlaneY);
-  ctx.stroke();
+  dctx.beginPath();
+  dctx.rect(backPlane.x, backPlane.y, backPlane.width, backPlane.height);
+  dctx.strokeStyle=colorAtLightness(minLightness-2);
+  dctx.stroke();
   
-  ctx.beginPath();
-  ctx.moveTo(0, canvas.height);
-  ctx.lineTo(backPlaneX, backPlaneY+(renderYFromCenter*2));
-  ctx.stroke();
+  dctx.beginPath();
+  dctx.rect(frontPlane.x, frontPlane.y, frontPlane.width, frontPlane.height);
+  dctx.strokeStyle=colorAtLightness(maxLightness+5);
+  dctx.stroke();
   
-  ctx.beginPath();
-  ctx.moveTo(canvas.width, canvas.height);
-  ctx.lineTo(backPlaneX+(renderXFromCenter*2), backPlaneY+(renderYFromCenter*2));
-  ctx.stroke();
+  
+  dctx.strokeStyle=colorAtLightness(minLightness+5);
+  dctx.beginPath();
+  dctx.moveTo(0, 0);
+  dctx.lineTo(backPlane.x, backPlane.y);
+  dctx.stroke();
+  
+  dctx.beginPath();
+  dctx.moveTo(canvas.width, 0);
+  dctx.lineTo(backPlane.x+backPlane.width, backPlane.y);
+  dctx.stroke();
+  
+  dctx.beginPath();
+  dctx.moveTo(0, canvas.height);
+  dctx.lineTo(backPlane.x, backPlane.y+backPlane.height);
+  dctx.stroke();
+  
+  dctx.beginPath();
+  dctx.moveTo(canvas.width, canvas.height);
+  dctx.lineTo(backPlane.x+backPlane.width, backPlane.y+backPlane.height);
+  dctx.stroke();
+  
+}
+
+function createDepthImg(){
+  let initLightness= 50;
 }
 
 function animate(newSquare){
   ctx.clearRect(0,0,canvas.width, canvas.height);
-  drawDepth();
+  ctx.drawImage(depthCanvas, 0, 0); // shrink to half size
   newSquare.moveAlongPath();
   
   
@@ -327,6 +386,7 @@ function animate(newSquare){
 function render(){
   resizeCanvas();
   updateDrawingVariables();
+  drawDepth();
   let newSquare= new Square(canvas.width/2, Math.PI, squareWidth, squareHeight);
   //console.log(newSquare.pointsOnPath)
   animate(newSquare);
@@ -335,6 +395,8 @@ function render(){
 //...initial render
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
+const depthCanvas= document.createElement("canvas");
+const dctx= depthCanvas.getContext("2d");
 
 render();
 /** section end **/
