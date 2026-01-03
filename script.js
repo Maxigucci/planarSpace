@@ -25,7 +25,7 @@ class Square{
     this.initOrbitAngle= initOrbitAngle;
     this.width= width;
     this.height= height;
-    this.radius= (this.width<this.height)? this.width: this.height; //this class is meant to be a template for a square object but i will add this parameter incase i want to draw a circle at its coordinates
+    this.radius= (this.width<this.height)? this.width/2: this.height/2; //this class is meant to be a template for a square object but i will add this parameter incase i want to draw a circle at its coordinates
     this.dAngleAlongOrbit= dAngleAlongOrbit/framePerSecond;
     //dAngleAlongOrbit must be in rad and it is per second (60 frames ≈ 1 second). During property assignment above, it is converted to be per frame.
     this.numOfOrbitsToCenter=numOfOrbitsToCenter;
@@ -130,6 +130,7 @@ class Square{
     //update width and height
     this.width= (squareWidth*renderSpaceWidth)/maxSpaceWidth;
     this.height= (squareHeight*renderSpaceHeight)/maxSpaceHeight;
+    this.radius= (this.width<this.height)? this.width/2: this.height/2;
     
     /**
     this.renderPoint.dx= (this.spatialPoint.dx*renderSpaceWidth)/maxSpaceWidth;
@@ -141,7 +142,10 @@ class Square{
     let lightness= lightnessAtDepth(this.spatialPoint.z);
     ctx.fillStyle= colorAtLightness(lightness);
     ctx.beginPath();
-    ctx.fillRect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
+    //ctx.rect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
+    ctx.arc(this.renderPoint.x, this.renderPoint.y, this.radius, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle= colorAtLightness(lightness+2);
     ctx.stroke();
     
     /**
