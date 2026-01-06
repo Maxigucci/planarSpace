@@ -19,12 +19,15 @@ class RenderPoint{
 
 //every square object from this class will have initial 3D coordinates that will be determined using orbit radius on x,z plane and initail angle on the same plane to derive the spatial point, the axis points are parametric functions of time. as time progresses the x and z coordinates trace an inward/collapsing orbit around the plane center and y coordinate is determined by a noise function that is unique to every instance of square where the range of y steadily shrinks to 0 proportional to the rate of orbit collapse.
 class Square{
-  constructor(currentOrbitRadius, initOrbitAngle, width, height, dAngleAlongOrbit=Math.PI/5, numOfOrbitsToCenter=5){
+  constructor(currentOrbitRadius, initOrbitAngle, timeToCenter, width, height,  dAngleAlongOrbit=Math.PI/10, numOfOrbitsToCenter=5){
     
     this.currentOrbitRadius= currentOrbitRadius;
     this.initOrbitAngle= initOrbitAngle;
+    this.timeToCenter= timeToCenter;
     this.width= width;
     this.height= height;
+    this.initWidth= width;
+    this.initHeight= height;
     this.radius= (this.width<this.height)? this.width/2: this.height/2; //this class is meant to be a template for a square object but i will add this parameter incase i want to draw a circle at its coordinates
     this.dAngleAlongOrbit= dAngleAlongOrbit/framePerSecond;
     //dAngleAlongOrbit must be in rad and it is per second (60 frames ≈ 1 second). During property assignment above, it is converted to be per frame.
@@ -45,6 +48,9 @@ class Square{
     
     this.spatialPoint= this.initSpatialPoint();
     this.renderPoint= new RenderPoint();
+    
+    this.hue= Math.floor(Math.random() * (360 - 1 + 1)) + 1;
+    this.saturation= Math.floor(Math.random() * (100 - 35 + 1)) + 35;
     
     this.computePointsOnPath();
     this.updateRenderParameters()
@@ -105,7 +111,7 @@ class Square{
       this.currentNoiseRange+=this.dNoiseRange;
       
     }
-    this.speedAlongCurve= this.curveLength/(30*framePerSecond);
+    this.speedAlongCurve= this.curveLength/(this.timeToCenter*framePerSecond);
     
   }
   updateRenderParameters(){
@@ -125,11 +131,10 @@ class Square{
     //update speed
     let renderSpaceWidth= (viewerDistance/(triangleHeight/midSpaceWidth))*2;
     let renderSpaceHeight= (viewerDistance/(triangleHeight/midSpaceHeight))*2;
-    console.log(renderSpaceWidth)
     
     //update width and height
-    this.width= (squareWidth*renderSpaceWidth)/maxSpaceWidth;
-    this.height= (squareHeight*renderSpaceHeight)/maxSpaceHeight;
+    this.width= (this.initWidth*renderSpaceWidth)/maxSpaceWidth;
+    this.height= (this.initHeight*renderSpaceHeight)/maxSpaceHeight;
     this.radius= (this.width<this.height)? this.width/2: this.height/2;
     
     /**
@@ -140,12 +145,12 @@ class Square{
   }
   draw(){
     let lightness= lightnessAtDepth(this.spatialPoint.z);
-    ctx.fillStyle= colorAtLightness(lightness);
+    ctx.fillStyle= `hsl(${this.hue}, ${this.saturation}%, ${lightness}%)`;
     ctx.beginPath();
     //ctx.rect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
     ctx.arc(this.renderPoint.x, this.renderPoint.y, this.radius, 0, Math.PI*2);
     ctx.fill();
-    ctx.strokeStyle= colorAtLightness(lightness+2);
+    ctx.strokeStyle= `hsl(${this.hue}, ${this.saturation}%, ${lightness+2}%)`;
     ctx.stroke();
     
     /**
@@ -196,10 +201,7 @@ class Square{
   }
   moveAlongPath(){
     this.updateSpatialPoint();
-    console.log(this.spatialPoint)
     this.updateRenderParameters();
-    console.log(this.renderPoint)
-    console.log(this.width)
     this.draw();
   }
   
@@ -221,11 +223,14 @@ let squareHeight;
 const dTime= 0.001
 const currentTime= 0.9;
 const framePerSecond= 60;
+let frameCounter= 0;
 
 let maxLightness= 50; 
 let minLightness= 25;
 let lightnessRange= maxLightness-minLightness;
 let depthRange;
+
+let squaresArray = [];
 /** section end **/
 
 //functions
@@ -271,11 +276,11 @@ function updateDrawingVariables(){
   midSpaceWidth= maxSpaceWidth/2;
   midSpaceHeight= maxSpaceHeight/2;
   
-  viewerDistance= canvas.width*0.5;
+  viewerDistance= canvas.width*0.9;
   maxSpaceDepth= canvas.width;
   midSpaceDepth= maxSpaceDepth/2;
-  squareWidth= canvas.width*0.1;
-  squareHeight= canvas.height*0.1;
+  squareWidth= canvas.width*0.03;
+  squareHeight= canvas.height*0.03;
   
   depthRange= maxSpaceDepth;
 }
@@ -369,18 +374,42 @@ function drawDepth(){
   
 }
 
-function createDepthImg(){
-  let initLightness= 50;
+function createSquares(){
+  let numOfSquares= Math.floor(Math.random() * (3 - 1 + 1)) + 1;
+  
+  //hardcoded
+  for(let i=0; i<numOfSquares; i++){
+    let radius= canvas.width/2;
+    let angle= Math.floor(Math.random() * ((Math.PI*2) + 1));
+    let time= Math.floor(Math.random() * (35 - 15 + 1)) + 15;
+    let sizeScale= 0.03;
+    
+    squaresArray.push(new Square(radius, angle, time, canvas.width*sizeScale, canvas.height*sizeScale));
+    
+  }
 }
 
-function animate(newSquare){
+function animate(){
   ctx.clearRect(0,0,canvas.width, canvas.height);
-  ctx.drawImage(depthCanvas, 0, 0); // shrink to half size
-  newSquare.moveAlongPath();
+  ctx.drawImage(depthCanvas, 0, 0);
+  
+  if(frameCounter>=framePerSecond){
+    frameCounter= 0;
+    if(!(squaresArray.length>=50)){
+      createSquares();
+    }
+  }
+  frameCounter++
+  squaresArray= [...squaresArray].sort((a,b)=> b.spatialPoint.z - a.spatialPoint.z);
+  squaresArray.forEach((square, index, array)=>{
+    square.moveAlongPath();
+    if(square.currentDistanceAlongCurve>=square.curveLength){
+      array.splice(index, 1);
+    }
+  })
   
   
-  
-  requestAnimationFrame(()=> animate(newSquare));
+  requestAnimationFrame(()=> animate());
   //newSquare.draw();
   //console.log(newSquare.scaledNoise1D(currentTime, 0, canvas.height));
   //console.log(newSquare.pointsOnPath);
@@ -391,9 +420,10 @@ function render(){
   resizeCanvas();
   updateDrawingVariables();
   drawDepth();
-  let newSquare= new Square(canvas.width/2, Math.PI, squareWidth, squareHeight);
+  let newSquare= new Square(canvas.width/2, Math.PI, 20, squareWidth, squareHeight);
+  let neSquare= new Square(canvas.width/2, Math.PI/5, 20, squareWidth, squareHeight);
   //console.log(newSquare.pointsOnPath)
-  animate(newSquare);
+  animate();
 }
 
 //...initial render
