@@ -137,31 +137,15 @@ class Square{
     this.height= (this.initHeight*renderSpaceHeight)/maxSpaceHeight;
     this.radius= (this.width<this.height)? this.width/2: this.height/2;
     
-    /**
-    this.renderPoint.dx= (this.spatialPoint.dx*renderSpaceWidth)/maxSpaceWidth;
-    this.renderPoint.dy= (this.spatialPoint.dy*renderSpaceHeight)/maxSpaceHeight;
-    **/
-    
   }
   draw(){
     let lightness= lightnessAtDepth(this.spatialPoint.z);
     ctx.fillStyle= `hsl(${this.hue}, ${this.saturation}%, ${lightness}%)`;
     ctx.beginPath();
-    //ctx.rect(this.renderPoint.x, this.renderPoint.y, this.width, this.height);
     ctx.arc(this.renderPoint.x, this.renderPoint.y, this.radius, 0, Math.PI*2);
     ctx.fill();
     ctx.strokeStyle= `hsl(${this.hue}, ${this.saturation}%, ${lightness+2}%)`;
     ctx.stroke();
-    
-    /**
-    //test: draw path
-    ctx.beginPath();
-    ctx.moveTo(this.pointsOnPath[0].x, this.pointsOnPath[0].y);
-    for(let i=0; i<this.pointsOnPath.length; i++){
-      ctx.lineTo(this.pointsOnPath[i].x, this.pointsOnPath[i].y);
-    }
-    ctx.stroke();
-    **/
   }
   
   updateSpatialPoint(){
@@ -176,22 +160,17 @@ class Square{
     
     this.pointsOnPath.some((currentPoint, index, array)=>{
       if(distanceAtCurrentPoint < this.currentDistanceAlongCurve){
-        //console.log("less than")
         distanceAtPrevPoint= distanceAtCurrentPoint;
         distanceAtCurrentPoint+= currentPoint.distanceFromPrevPoint;
-        //console.log("less than")
       }else if(distanceAtCurrentPoint > this.currentDistanceAlongCurve){
-        //console.log("finalyGreater")
         let segmentRatio= (this.currentDistanceAlongCurve - distanceAtPrevPoint)/(distanceAtCurrentPoint - distanceAtPrevPoint);
         let prevPoint= array[index-1];
-        //console.log(prevPoint)
         this.spatialPoint.x= prevPoint.x+ (segmentRatio+(currentPoint.x- prevPoint.x));
         this.spatialPoint.y= prevPoint.y+ (segmentRatio+(currentPoint.y- prevPoint.y));
         this.spatialPoint.z= prevPoint.z+ (segmentRatio+(currentPoint.z- prevPoint.z));
         
         return true;
       }else{
-        //console.log("equal")
         this.spatialPoint.x= currentPoint.x;
         this.spatialPoint.y= currentPoint.y;
         this.spatialPoint.z= currentPoint.z;
@@ -410,9 +389,6 @@ function animate(){
   
   
   requestAnimationFrame(()=> animate());
-  //newSquare.draw();
-  //console.log(newSquare.scaledNoise1D(currentTime, 0, canvas.height));
-  //console.log(newSquare.pointsOnPath);
   
 }
 
@@ -420,9 +396,6 @@ function render(){
   resizeCanvas();
   updateDrawingVariables();
   drawDepth();
-  let newSquare= new Square(canvas.width/2, Math.PI, 20, squareWidth, squareHeight);
-  let neSquare= new Square(canvas.width/2, Math.PI/5, 20, squareWidth, squareHeight);
-  //console.log(newSquare.pointsOnPath)
   animate();
 }
 
