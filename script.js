@@ -140,11 +140,11 @@ class Square{
   }
   draw(){
     let lightness= lightnessAtDepth(this.spatialPoint.z);
-    ctx.fillStyle= `hsl(${this.hue}, ${this.saturation}%, ${lightness}%)`;
+    ctx.fillStyle= `hsl(${this.hue}, 100%, ${lightness}%)`;
     ctx.beginPath();
     ctx.arc(this.renderPoint.x, this.renderPoint.y, this.radius, 0, Math.PI*2);
     ctx.fill();
-    ctx.strokeStyle= `hsl(${this.hue}, ${this.saturation}%, ${lightness+2}%)`;
+    ctx.strokeStyle= `hsl(${this.hue}, 100%, ${lightness+2}%)`;
     ctx.stroke();
   }
   
@@ -283,7 +283,7 @@ const lightnessAtDepth=(depth)=>{
 }
 
 const colorAtLightness =(lightness)=>{
-    return `hsl(210, 20%, ${lightness}%)`
+    return `hsl(230, 30%, ${lightness}%)`
   }
 
 function drawDepth(){
